@@ -28,7 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== 游戏配置参数 - 可自由调整 =====
     const gridSize = 20;      // 网格大小，决定蛇和食物的大小
-    const tileCount = canvas.width / gridSize;  // 网格数量
+    const tileCount = 400 / gridSize;  // 保持基于400x400的网格系统
+
 
 
     let isCollisionAvoidanceEnabled = false; // 是否启用防碰撞逻辑
@@ -44,6 +45,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const maxSpeed = 20;      // 最大速度限制（格/秒）
     const comboSpeedBoost = 3;   // combo时的额外加速（格/秒）
     
+    // 新增：画布尺寸自适应
+    function resizeCanvas() {
+        const canvasSize = Math.min(window.innerWidth * 0.6, window.innerHeight * 0.6);
+        canvas.style.width = canvasSize + 'px';
+        canvas.style.height = canvasSize + 'px';
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas(); // 初始调用
+
+
+
+
+
     // 计算基于分数的速度增加值
     function calculateSpeedIncrease(score) {
         // 找出最大的10的幂次方，且该数乘以基础分数间隔小于等于当前分数
@@ -307,6 +321,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function drawSnake() {
         ctx.fillStyle = 'green';
+
         snake.forEach(segment => {
             ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 2, gridSize - 2);
         });
@@ -317,6 +332,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function drawFood() {
         ctx.fillStyle = 'red';
+
         ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
     }
 
