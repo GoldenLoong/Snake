@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>贪吃蛇</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;  /* 防止出现滚动条 */
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;  /* 垂直居中 */
+        }
+        .main-container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            height: fit-content;
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+            margin: 20px;
+            align-items: flex-start;
+        }
+        .game-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .top-info {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        .bottom-info {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+        .info-item.reverse {
+            flex-direction: column-reverse;
+        }
+        .info-label {
+            color: #666;
+            font-size: 14px;
+        }
+        .info-value {
+            background-color: #333;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-size: 18px;
+            margin: 3px 0;
+        }
+        #comboTime {
+            color: #ffd700;
+        }
+        #combo {
+            transition: font-size 0.3s;
+        }
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 200px;
+        }
+        #gameCanvas {
+            border: 2px solid #333;
+            background-color: white;
+        }
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .game-button {
+            padding: 15px 30px;
+            font-size: 20px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        
+        .game-button:hover {
+            background-color: #45a049;
+        }
+        
+        .game-button.active {
+            background-color: #e74c3c;
+        }
+        
+        #historyModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        
+        #historyModal h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .history-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="game-container">
+            <div class="game-section">
+                <div class="top-info">
+                    <div class="info-item">
+                        <div class="info-label">时间</div>
+                        <div class="info-value" id="timer">0:00</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">得分</div>
+                        <div class="info-value" id="score">0</div>
+                    </div>
+                </div>
+                
+                <canvas id="gameCanvas" width="400" height="400"></canvas>
+                
+                <div class="bottom-info">
+                    <div class="info-item reverse">
+                        <div class="info-label">连击时间</div>
+                        <div class="info-value" id="comboTime">0</div>
+                    </div>
+                    <div class="info-item reverse">
+                        <div class="info-label">连击</div>
+                        <div class="info-value" id="combo">x1</div>
+                    </div>
+                    <div class="info-item reverse">
+                        <div class="info-label">速度</div>
+                        <div class="info-value"><span id="speed">5</span> 格/秒</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-panel">
+                <div class="button-group">
+                    <button id="restartBtn" class="game-button">重新开始</button>
+                    <button id="historyBtn" class="game-button">历史排行榜</button>
+                    <button id="autoPlayBtn" class="game-button">机器代玩</button>
+                </div>
+                <div class="instructions">
+                    <p><strong>游戏规则：</strong><br>
+                        - 吃到食物得10分<br>
+                        - 达到1000分、10000分等时加速2格/秒<br>
+                        - 5秒内连续吃到食物可以获得连击<br>
+                        - 连击期间速度加快，得分翻倍, 可无限累乘<br>
+                        - 撞到自己游戏结束
+                    </p>
+                    <p><strong>操作方法：</strong><br>
+                        使用方向键控制蛇的移动方向
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div id="historyModal">
+        <h2>历史最高分</h2>
+        <div class="history-list" id="historyList">
+            <!-- 历史记录将通过JavaScript动态插入 -->
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
