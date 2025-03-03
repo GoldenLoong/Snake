@@ -30,12 +30,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const gridSize = 20;      // 网格大小，决定蛇和食物的大小
     const tileCount = canvas.width / gridSize;  // 网格数量
 
-
+    // 游戏速度配置（格/秒）
     let isCollisionAvoidanceEnabled = false; // 是否启用防碰撞逻辑
     let currentTarget = null; // 当前预判点位
 
-
-    // 游戏速度配置（格/秒）
     const initialSpeed = 5;    // 初始速度（格/秒）
     let gameSpeed = initialSpeed;  // 当前速度
     let baseSpeed = initialSpeed;  // 基础速度
@@ -44,6 +42,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const maxSpeed = 20;      // 最大速度限制（格/秒）
     const comboSpeedBoost = 3;   // combo时的额外加速（格/秒）
     
+    // 新增：画布尺寸自适应
+    function resizeCanvas() {
+        const canvasSize = Math.min(window.innerWidth * 0.8, 400);
+        canvas.style.width = canvasSize + 'px';
+        canvas.style.height = canvasSize + 'px';
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas(); // 初始调用
+
+    // 修改原有的tileCount计算方式（找到这行代码）
+    const tileCount = canvas.width / gridSize;  // 改为：
+    const tileCount = 400 / gridSize;  // 保持基于400x400的网格系统
+
+
     // 计算基于分数的速度增加值
     function calculateSpeedIncrease(score) {
         // 找出最大的10的幂次方，且该数乘以基础分数间隔小于等于当前分数
@@ -307,6 +319,8 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function drawSnake() {
         ctx.fillStyle = 'green';
+        const scale = canvas.width / 400; // 新增缩放系数
+
         snake.forEach(segment => {
             ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 2, gridSize - 2);
         });
@@ -317,6 +331,8 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function drawFood() {
         ctx.fillStyle = 'red';
+        const scale = canvas.width / 400; // 新增缩放系数
+
         ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
     }
 
@@ -357,6 +373,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         snake.unshift(head);
+        console.log('蛇头位置:', {x: head.x, y: head.y}); // ← 新增
+
         if (!hasEatenFood()) {
             snake.pop();
         }
@@ -369,6 +387,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function hasEatenFood() {
         const head = snake[0];
         if (head.x === food.x && head.y === food.y) {
+            console.log('吃到食物! 蛇头:', {x: head.x, y: head.y}, '食物:', {x: food.x, y: food.y}); // ← 新增
+
             const currentTime = gameTime;
             const timeDiff = currentTime - lastFoodTime;
             
@@ -390,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 comboElement.style.fontSize = '16px';
                 gameSpeed = baseSpeed;
             }
-            
+
             // 更新游戏循环间隔
             gameInterval = speedToInterval(gameSpeed);
             clearInterval(gameLoop);
@@ -439,6 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
         do {
             food.x = Math.floor(Math.random() * tileCount);
             food.y = Math.floor(Math.random() * tileCount);
+            console.log('新食物生成:', {x: food.x, y: food.y}); // ← 新增
             
             // 检查是否与蛇身重叠
             const onSnake = snake.some(segment => 
@@ -450,7 +471,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             isValid = !onSnake && !willDie;
             
-            // 防止无限循环，最多重试50次
+            // 防止无限循环，最多重试500次
             if (retryCount++ > 500) break; 
         } while (!isValid);
     
@@ -471,9 +492,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
-
-
-
+    
 
     /**
      * 判断游戏是否结束
@@ -512,8 +531,6 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.fillText('\u70B9\u51FB\u7A7A\u95F4\u91CD\u542F\u6E38\u620F', canvas.width / 2, canvas.height / 2 + 40);
         
         document.addEventListener('keydown', function restart(event) {
-            if(isAutoPlaying) return; // 自动玩时忽略方向键
-
             if (event.code === 'Space') {
                 document.removeEventListener('keydown', restart);
                 startGame();
@@ -616,92 +633,193 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * 开始/停止自动玩
      */
+    // 修改toggleAutoPlay函数
     function toggleAutoPlay() {
         isAutoPlaying = !isAutoPlaying;
         isCollisionAvoidanceEnabled = isAutoPlaying; // 启用防碰撞逻辑
         autoPlayBtn.classList.toggle('active');
         
         if (isAutoPlaying) {
+            gameStarted = true;  // 开始游戏
             autoPlayInterval = setInterval(autoPlay, 10);
         } else {
             clearInterval(autoPlayInterval);
         }
     }
-    
-
 
 
     /**
      * 机器人自动玩
      */
-    function autoPlay() {
-        if (!isAutoPlaying) return;
-        const head = snake[0];
-        let target = food;
+function autoPlay() {
+    if (!isAutoPlaying) return;
+
+    const head = snake[0];
+    const normalizedHead = {
+        x: (head.x + tileCount) % tileCount,
+        y: (head.y + tileCount) % tileCount
+    };
+
+    // 新增：优化边界矢量计算
+    const deltaX = (food.x - normalizedHead.x + tileCount) % tileCount - tileCount/2;
+    const deltaY = (food.y - normalizedHead.y + tileCount) % tileCount - tileCount/2;
+
+    // 优先选择最接近食物的方向
+    const directionCandidates = getDynamicPriorities(dx, dy);
+    let bestDir = directionCandidates[0];
     
-        // ==== 新增：处理穿墙后的头部坐标 ====
-        const normalizedHead = {
-            x: (head.x + tileCount) % tileCount,
-            y: (head.y + tileCount) % tileCount
+    directionCandidates.forEach(dir => {
+        const dirValue = dir.dx * deltaX + dir.dy * deltaY;
+        const bestValue = bestDir.dx * deltaX + bestDir.dy * deltaY;
+        if (dirValue > bestValue) bestDir = dir;
+    });
+
+    // 防反向检查
+    if (!((dx !== 0 && bestDir.dx === -dx) || (dy !== 0 && bestDir.dy === -dy))) {
+        dx = bestDir.dx;
+        dy = bestDir.dy;
+    }
+}
+    
+    
+
+
+    // 动态方向优先级
+    function getDynamicPriorities(currentDx, currentDy) {
+        // 新增：获取食物方向
+        const getDirectionToFood = () => {
+            const head = snake[0];
+            const deltaX = (food.x - head.x + tileCount) % tileCount - tileCount/2;
+            const deltaY = (food.y - head.y + tileCount) % tileCount - tileCount/2;
+            
+            let dirX = 0, dirY = 0;
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                dirX = deltaX > 0 ? 1 : -1;
+            } else {
+                dirY = deltaY > 0 ? 1 : -1;
+            }
+            return { dx: dirX, dy: dirY };
         };
     
-        if (isCollisionAvoidanceEnabled) {
-            // ==== 修改：传入标准化后的头部坐标 ====
-            const safePath = findSafePath(normalizedHead, food);
-            if (safePath.length > 0) {
-                target = safePath[0];
-            } else {
-                target = findFallbackTarget(normalizedHead);
-            }
-        }
-    
-        // ==== 修改：计算真实距离（考虑穿墙）====
-        let realDeltaX = (target.x - normalizedHead.x + tileCount) % tileCount;
-        let realDeltaY = (target.y - normalizedHead.y + tileCount) % tileCount;
+        const foodDir = getDirectionToFood();
         
-        // 调整最短路径方向
-        if (realDeltaX > tileCount/2) realDeltaX -= tileCount;
-        if (realDeltaY > tileCount/2) realDeltaY -= tileCount;
+        // 优先朝向食物方向的候选列表
+        const baseDirections = [
+            foodDir,                    // 第一优先级：食物方向
+            { dx: currentDx, dy: currentDy }, 
+            { dx: -currentDy, dy: currentDx }, 
+            { dx: currentDy, dy: -currentDx }
+        ].filter(d => !(d.dx === 0 && d.dy === 0));
     
-        // ==== 原有方向计算逻辑保持不变 ====
-        let newDx = dx;
-        let newDy = dy;
-    
-        if (Math.abs(realDeltaX) > Math.abs(realDeltaY)) {
-            newDx = realDeltaX > 0 ? 1 : -1;
-            newDy = 0;
-        } else {
-            newDx = 0;
-            newDy = realDeltaY > 0 ? 1 : -1;
-        }
-    
-        // 检查反向移动
-        if ((dx !== 0 && newDx === -dx) || (dy !== 0 && newDy === -dy)) {
-            return;
-        }
-    
-        dx = newDx;
-        dy = newDy;
-    }
-    
-
-
-
-    
-    // 新增辅助函数
-    function isPositionSafe(x, y) {
-        // ==== 新增：坐标标准化 ====
-        const normalizedX = (x + tileCount) % tileCount;
-        const normalizedY = (y + tileCount) % tileCount;
-        
-        return !snake.some(segment => {
-            const segX = (segment.x + tileCount) % tileCount;
-            const segY = (segment.y + tileCount) % tileCount;
-            return segX === normalizedX && segY === normalizedY;
+        // 过滤危险方向
+        return baseDirections.filter(d => {
+            const nextX = (snake[0].x + d.dx + tileCount) % tileCount;
+            const nextY = (snake[0].y + d.dy + tileCount) % tileCount;
+            return !snake.some(s => s.x === nextX && s.y === nextY);
         });
     }
 
 
+
+
+    // 新增路径安全检查函数
+    function checkPathSafety(path) {
+        if (!path.length) return true;
+        
+        const virtualSnake = [...snake.map(s => ({...s}))];
+        let ateFood = false;
+    
+        for (const [index, step] of path.entries()) {
+            // 模拟吃到食物
+            if (!ateFood && step.x === food.x && step.y === food.y) {
+                ateFood = true;
+            } else {
+                virtualSnake.pop();
+            }
+            virtualSnake.unshift({x: step.x, y: step.y});
+    
+            // 动态风险评估
+            const surroundings = [
+                {dx: 1, dy: 0}, {dx: -1, dy: 0},
+                {dx: 0, dy: 1}, {dx: 0, dy: -1}
+            ];
+            
+            const dangerLevel = surroundings.filter(({dx, dy}) => {
+                const nx = (step.x + dx + tileCount) % tileCount;
+                const ny = (step.y + dy + tileCount) % tileCount;
+                return virtualSnake.some(s => s.x === nx && s.y === ny);
+            }).length;
+    
+            if (dangerLevel >= 3) return true;
+            
+            // 边缘区域额外检测
+            const isAtBorder = 
+                step.x === 0 || step.x === tileCount-1 ||
+                step.y === 0 || step.y === tileCount-1;
+    // 修改危险阈值
+        if (dangerLevel >= 3) return true; // 原为3
+        if (isAtBorder && dangerLevel >= 2) return true; // 原为2
+        }
+        return false;
+    }
+
+
+
+    // 新增深度避险目标寻找
+    function findEscapeTarget(head) {
+        const directions = getDynamicPriorities(dx, dy); // 传入当前方向
+        let bestDir = directions[0];
+        let maxScore = -Infinity;
+    
+        directions.forEach(dir => {
+            let score = 0;
+            let current = {...head};
+            const visited = new Set();
+    
+            for (let i = 0; i < 10; i++) { // 预测10步
+                current = {
+                    x: (current.x + dir.dx + tileCount) % tileCount,
+                    y: (current.y + dir.dy + tileCount) % tileCount
+                };
+                
+                if (snake.some(s => s.x === current.x && s.y === current.y)) break;
+                if (visited.has(`${current.x},${current.y}`)) break;
+                
+                visited.add(`${current.x},${current.y}`);
+                score += 1;
+                
+                // 中心区域加权
+                const centerX = tileCount/2;
+                const centerY = tileCount/2;
+                score -= Math.abs(current.x - centerX) * 0.1;
+                score -= Math.abs(current.y - centerY) * 0.1;
+            }
+    
+            if (score > maxScore) {
+                maxScore = score;
+                bestDir = dir;
+            }
+        });
+    
+        return {
+            x: (head.x + bestDir.dx + tileCount) % tileCount,
+            y: (head.y + bestDir.dy + tileCount) % tileCount
+        };
+    }
+    
+    
+
+
+    // ===== 修改后的辅助函数 =====
+    function isPositionSafe(x, y) {
+        const directions = [[1,0], [-1,0], [0,1], [0,-1]];
+        const safeDirections = directions.filter(([dx, dy]) => {
+            const nx = (x + dx + tileCount) % tileCount;
+            const ny = (y + dy + tileCount) % tileCount;
+            return !snake.some(s => s.x === nx && s.y === ny);
+        });
+        return safeDirections.length >= 1; // 修改为至少一个安全方向
+    }
 
 
     function findSafePath(start, end) {
@@ -711,7 +829,6 @@ document.addEventListener('DOMContentLoaded', function() {
         while (queue.length > 0) {
             let [x, y, path] = queue.shift();
             
-            // ==== 新增：坐标标准化 ====
             x = (x + tileCount) % tileCount;
             y = (y + tileCount) % tileCount;
             
@@ -729,40 +846,90 @@ document.addEventListener('DOMContentLoaded', function() {
             
             for (const [nx, ny] of neighbors) {
                 const key = `${nx},${ny}`;
-                if (!visited.has(key) && isPositionSafe(nx, ny)) {
-                    visited.add(key);
-                    queue.push([nx, ny, [...path, {x: nx, y: ny}]]);
+                if (!visited.has(key)) {
+                    // 修正：正确模拟吃到食物后的蛇身增长
+                    const futureSnake = [{x:nx, y:ny}, ...snake];
+                    const willEatFood = nx === food.x && ny === food.y;
+                    if (!willEatFood) futureSnake.pop();
+                    
+                    const willCollide = futureSnake.slice(1).some(s => 
+                        s.x === nx && s.y === ny
+                    );
+                    
+                    if (!willCollide && isPositionSafe(nx, ny)) {
+                        visited.add(key);
+                        queue.push([nx, ny, [...path, {x: nx, y: ny}]]);
+                    }
                 }
             }
         }
         return [];
     }
-
-
     
 
+    
+    // 修改findFallbackTarget函数
     function findFallbackTarget(head) {
-        // 寻找最近的安全点
+        // 寻找最长安全路径方向
         const directions = [
-            [1, 0], [-1, 0], [0, 1], [0, -1]
+            {dx: 1, dy: 0},  // 右
+            {dx: -1, dy: 0}, // 左
+            {dx: 0, dy: 1},  // 下
+            {dx: 0, dy: -1}  // 上
         ];
-        
-        for (const [dx, dy] of directions) {
-            const x = head.x + dx;
-            const y = head.y + dy;
-            if (isPositionSafe(x, y)) {
-                return {x, y};
+
+        // 计算每个方向的可用空间
+        let bestDir = directions[0];
+        let maxSpace = -1;
+
+        directions.forEach(dir => {
+            if ((dir.dx === -dx && dir.dy === -dy) || 
+                (dir.dx === dx && dir.dy === dy)) return;
+
+            let space = 0;
+            let current = {
+                x: (head.x + dir.dx + tileCount) % tileCount,
+                y: (head.y + dir.dy + tileCount) % tileCount
+            };
+            
+            // 使用虚拟蛇探索最大可用空间
+            const visited = new Set();
+            const virtualSnake = [...snake.map(s => ({...s}))];
+            
+            while(true) {
+                const key = `${current.x},${current.y}`;
+                if(visited.has(key)) break;
+                visited.add(key);
+                
+                if(virtualSnake.some(s => s.x === current.x && s.y === current.y)) break;
+                
+                virtualSnake.unshift({...current});
+                virtualSnake.pop();
+                
+                space++;
+                current = {
+                    x: (current.x + dir.dx + tileCount) % tileCount,
+                    y: (current.y + dir.dy + tileCount) % tileCount
+                };
             }
-        }
-        return head; // 没有安全点时保持原方向
+            
+            if(space > maxSpace) {
+                maxSpace = space;
+                bestDir = dir;
+            }
+        });
+
+        // 返回最大空间方向
+        return {
+            x: (head.x + bestDir.dx + tileCount) % tileCount,
+            y: (head.y + bestDir.dy + tileCount) % tileCount
+        };
     }
-
-
-
-
 
     // 添加事件监听器
     document.addEventListener('keydown', function(event) {
+        if(isAutoPlaying) return; // 自动玩时忽略方向键
+
         // \u9632\u6b62\u65b9\u5411\u952e\u8fdb\u884c\u9875\u9762\u6ed1\u52a8
         if([32, 37, 38, 39, 40].indexOf(event.keyCode) > -1) {
             event.preventDefault();

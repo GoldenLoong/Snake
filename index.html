@@ -1,9 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=0.5">
     <meta charset="UTF-8">
     <title>贪吃蛇</title>
     <style>
+        /* 手机端适配 */
+        @media screen and (max-width: 600px) {
+            .main-container {
+                transform: scale(0.8);
+                transform-origin: top center;
+                padding: 10px;
+            }
+
+            #gameCanvas {
+                width: 90vw !important;
+                height: 90vw !important;
+                max-width: 400px;
+                max-height: 400px;
+            }
+
+            .control-panel {
+                width: 90vw;
+                max-width: 200px;
+            }
+
+            .game-button {
+                padding: 12px;
+                font-size: 16px;
+            }
+
+            .info-value {
+                padding: 3px 10px;
+                font-size: 16px;
+            }
+        }
+
+        /* 允许页面缩放 */
+        body {
+            touch-action: manipulation;
+            min-height: 100vh;
+            overflow: auto;  /* 移除原来的overflow: hidden */
+        }
         html, body {
             height: 100%;
             margin: 0;
@@ -169,8 +207,7 @@
                     </div>
                 </div>
                 
-                <canvas id="gameCanvas" width="400" height="400"></canvas>
-                
+                <canvas id="gameCanvas" width="400" height="400" style="width: 80vmin; height: 80vmin"></canvas>                
                 <div class="bottom-info">
                     <div class="info-item reverse">
                         <div class="info-label">连击时间</div>
